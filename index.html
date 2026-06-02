@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apex Flow - Facturación, Inventario, Clientes & Citas</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+  <!-- Babel Standalone to compile JSX in-browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+
+<body>
+
+  <!-- React Root Container -->
+  <div id="root"></div>
+
+  <!-- React Application Source -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // --- SEED DATA / DEFAULT INITIAL DATA ---
+    const INITIAL_USERS = [
+      { id: 'u-1', name: 'Sofia Castro', email: 'sofia.admin@apex.com', password: 'admin123', role: 'admin' },
+      { id: 'u-2', name: 'Carlos Mendoza', email: 'carlos.sales@apex.com', password: 'vendedor123', role: 'seller' },
+      { id: 'u-3', name: 'Elena Rivas', email: 'elena.stock@apex.com', password: 'gestor123', role: 'inventory' },
+      { id: 'u-4', name: 'Mateo Ortega', email: 'mateo.schedule@apex.com', password: 'agenda123', role: 'scheduler' }
+    ];
+
+    const INITIAL_CLIENTS = [
+      { id: 'c-1', name: 'Lucía Fernández', cid: 'V-25123456', address: 'Av. Bolívar 45, Caracas', phone: '0412-5551234', email: 'lucia.fer@gmail.com', balance: 0 },
+      { id: 'c-2', name: 'Distribuidora Global C.A.', cid: 'J-30495867-1', address: 'Calle Comercial Sec. 3, Valencia', phone: '0241-8889900', email: 'contacto@distglobal.com', balance: 450.00 }
+    ];
+
+    const INITIAL_PRODUCTS = [
+      { id: 'p-1', sku: 'LAP-DELL-01', name: 'Laptop Dell XPS 13', category: 'Equipos', cost: 850, price: 1250, stock: 8, minStock: 3 },
+      { id: 'p-2', sku: 'MON-LG-27', name: 'Monitor LG UltraWide 27"', category: 'Monitores', cost: 180, price: 290, stock: 12, minStock: 5 },
+      { id: 'p-3', sku: 'KEY-LOGI-MX', name: 'Teclado Mecánico MX Keys', category: 'Accesorios', cost: 70, price: 120, stock: 2, minStock: 4 }, // Low Stock
+      { id: 'p-4', sku: 'MOU-LOGI-3S', name: 'Mouse Logitech MX Master 3S', category: 'Accesorios', cost: 60, price: 110, stock: 15, minStock: 4 },
+      { id: 'p-5', sku: 'HD-SONY-1000', name: 'Auriculares Sony WH-1000XM5', category: 'Audio', cost: 210, price: 350, stock: 0, minStock: 2 }, // Out of Stock
+      { id: 'p-6', sku: 'MIC-SHURE-MV7', name: 'Micrófono Shure MV7 USB', category: 'Audio', cost: 140, price: 220, stock: 6, minStock: 2 }
+    ];
+
+    const INITIAL_SERVICES = [
+      { id: 's-1', name: 'Soporte Técnico de Equipos', duration: 60, price: 45 },
+      { id: 's-2', name: 'Instalación & Configuración Red', duration: 120, price: 80 },
+      { id: 's-3', name: 'Limpieza Integral Hardware', duration: 45, price: 25 },
+      { id: 's-4', name: 'Consultoría TI Corporativa', duration: 90, price: 120 }
+    ];
+
+    const INITIAL_APPOINTMENTS = [
+      { id: 'a-1', customerName: 'Lucía Fernández', customerPhone: '0412-5551234', date: '2026-06-03', time: '09:00', serviceId: 's-1', worker: 'Ing. Mateo O.', status: 'pending' },
+      { id: 'a-2', customerName: 'Felipe Torres', customerPhone: '0412-5559876', date: '2026-06-03', time: '11:30', serviceId: 's-2', worker: 'Ing. Mateo O.', status: 'confirmed' },
+      { id: 'a-3', customerName: 'Lucía Fernández', customerPhone: '0412-5551234', date: '2026-06-02', time: '15:00', serviceId: 's-3', worker: 'Téc. Luis A.', status: 'completed' },
+      { id: 'a-4', customerName: 'Roberto Garza', customerPhone: '0416-1112233', date: '2026-06-04', time: '10:00', serviceId: 's-4', worker: 'Ing. Mateo O.', status: 'pending' }
+    ];
+
+    const INITIAL_INVOICES = [
+      {
+        id: 'FC-1001',
+        entId: '        clic-1',
+        customerName: 'Lucía Fernández',
+        customerId: 'V-25123456',
+        date: '2026-06-02',
+        items: [
+          { productId: 'p-3', name: 'Teclado Mecánico MX Keys', price: 120, quantity: 1 },
+          { productId: 'p-4', name: 'Mouse Logitech MX Master 3S', price: 110, quantity: 1 }
+        ],
+        subtotal: 230,
+        tax: 36.8,
+        total: 266.8,
+        paymentMethod: 'efectivo',
+        paymentDetails: { recibido: 300, cambio: 33.2 }
+      },
+      {
+        id: 'FC-1002',
+        clientId: 'c-2',
+        customerName: 'Distribuidora Global C.A.',
+        customerId: 'J-30495867-1',
+        date: '2026-06-01',
+        items: [
+          { productId: 'p-1', name: 'Laptop Dell XPS 13', price: 1250, quantity: 2 },
+          { productId: 'p-2', name: 'Monitor LG UltraWide 27"', price: 290, quantity: 1 }
+        ],
+        subtotal: 2790,
+        tax: 446.4,
+        total: 3236.4,
+        paymentMethod: 'pos',
+        paymentDetails: { referencia: 'POS-77481' }
+      }
+    ];
+
+    const formatMoney = (amount) => {
+      return '$' + Number(amount).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    // --- MAIN APP COMPONENT ---
+    function App() {
+      const [currentView, setCurrentView] = useState('dashboard');
+
+      // Sidebar states (desktop colapsar y móvil cajón flotante)
+      const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+      const [sidebarMobileOpen, setSidebarMobileOpen] = useState(false);
+
+      const [toast, setToast] = useState(null);
+
+      // Database state management
+      const [users, setUsers] = useState(() => {
+        const saved = localStorage.getItem('APEX_USERS_V3');
+        return saved ? JSON.parse(saved) : INITIAL_USERS;
+      });
+
+      const [clients, setClients] = useState(() => {
+        const saved = localStorage.getItem('APEX_CLIENTS_V3');
+        return saved ? JSON.parse(saved) : INITIAL_CLIENTS;
+      });
+
+      const [products, setProducts] = useState(() => {
+        const saved = localStorage.getItem('APEX_PRODUCTS_V3');
+        return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+      });
+
+      const [services, setServices] = useState(() => {
+        const saved = localStorage.getItem('APEX_SERVICES_V3');
+        return saved ? JSON.parse(saved) : INITIAL_SERVICES;
+      });
+
+      const [appointments, setAppointments] = useState(() => {
+        const saved = localStorage.getItem('APEX_APPOINTMENTS_V3');
+        return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
+      });
+
+      const [invoices, setInvoices] = useState(() => {
+        const saved = localStorage.getItem('APEX_INVOICES_V3');
+        return saved ? JSON.parse(saved) : INITIAL_INVOICES;
+      });
+
+      // Active Session
+      const [sessionUser, setSessionUser] = useState(() => {
+        const saved = sessionStorage.getItem('APEX_SESSION_USER_V3');
+        return saved ? JSON.parse(saved) : null;
+      });
+
+      // Redirect hook state
+      const [billingRedirectState, setBillingRedirectState] = useState(null);
+
+      // Save database changes
+      useEffect(() => {
+        localStorage.setItem('APEX_USERS_V3', JSON.stringify(users));
+      }, [users]);
+
+      useEffect(() => {
+        localStorage.setItem('APEX_CLIENTS_V3', JSON.stringify(clients));
+      }, [clients]);
+
+      useEffect(() => {
+        localStorage.setItem('APEX_PRODUCTS_V3', JSON.stringify(products));
+      }, [products]);
+
+      useEffect(() => {
+        localStorage.setItem('APEX_SERVICES_V3', JSON.stringify(services));
+      }, [services]);
+
+      useEffect(() => {
+        localStorage.setItem('APEX_APPOINTMENTS_V3', JSON.stringify(appointments));
+      }, [appointments]);
+
+      useEffect(() => {
+        localStorage.setItem('APEX_INVOICES_V3', JSON.stringify(invoices));
+      }, [invoices]);
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+      };
+
+      const handleLogin = (email, password) => {
+        const foundUser = users.find(u => u.email === email && u.password === password);
+        if (foundUser) {
+          setSessionUser(foundUser);
+          sessionStorage.setItem('APEX_SESSION_USER_V3', JSON.stringify(foundUser));
+          setCurrentView('dashboard');
+          showToast(`¡Hola, ${foundUser.name}! Bienvenido a tu sesión.`, 'success');
+        } else {
+          showToast('Credenciales incorrectas.', 'danger');
+        }
+      };
+
+      const handleLogout = () => {
+        setSessionUser(null);
+        sessionStorage.removeItem('APEX_SESSION_USER_V3');
+        showToast('Sesión finalizada.', 'success');
+      };
+
+      const hasPermission = (view) => {
+        if (!sessionUser) return false;
+        const role = sessionUser.role;
+        if (role === 'admin') return true;
+
+        switch (view) {
+          case 'dashboard':
+            return true;
+          case 'invoices':
+            return true;
+          case 'inventory':
+            return true;
+          case 'appointments':
+            return true;
+          case 'clients':
+            return role === 'seller' || role === 'scheduler';
+          case 'users':
+            return false;
+          default:
+            return false;
+        }
+      };
+
+      const resetDatabase = () => {
+        if (window.confirm('¿Deseas restablecer el sistema completo?')) {
+          setUsers(INITIAL_USERS);
+          setClients(INITIAL_CLIENTS);
+          setProducts(INITIAL_PRODUCTS);
+          setServices(INITIAL_SERVICES);
+          setAppointments(INITIAL_APPOINTMENTS);
+          setInvoices(INITIAL_INVOICES);
+          handleLogout();
+          showToast('Valores por defecto restablecidos.', 'success');
+        }
+      };
+
+      if (!sessionUser) {
+        return <LoginView onLogin={handleLogin} users={users} />;
+      }
+
+      return (
+        <div className={`app-container ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${sidebarMobileOpen ? 'sidebar-mobile-open' : ''}`}>
+
+          {/* [ESTRUCTURA] Overlay de menú móvil */}
+          {/* Mobile Overlay backdrop */}
+          <div className="sidebar-backdrop" onClick={() => setSidebarMobileOpen(false)}></div>
+
+          {/* [ESTRUCTURA] Notificaciones flotantes */}
+          {toast && (
+            <div className={`alert-toast ${toast.type === 'danger' ? 'alert-danger' : toast.type === 'success' ? 'alert-success' : ''}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                {toast.type === 'danger' ? (
+                  <>
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </>
+                ) : (
+                  <>
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </>
+                )}
+              </svg>
+              <span>{toast.message}</span>
+            </div>
+          )}
+
+          {/* [NAVEGACIÓN] Menú lateral de la aplicación */}
+          {/* Navigation Sidebar Drawer */}
+          <aside className="sidebar">
+            <div className="sidebar-logo">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              <span className="logo-text">APEX FLOW</span>
+            </div>
+
+            <ul className="sidebar-menu">
+              <li className="menu-item">
+                <a className={`menu-link ${currentView === 'dashboard' ? 'active' : ''}`} onClick={() => { setCurrentView('dashboard'); setSidebarMobileOpen(false); }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4z" />
+                  </svg>
+                  <span>Panel General</span>
+                </a>
+              </li>
+
+              <li className="menu-item">
+                <a className={`menu-link ${currentView === 'invoices' ? 'active' : ''}`} onClick={() => { setCurrentView('invoices'); setSidebarMobileOpen(false); }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span>Facturación</span>
+                </a>
+              </li>
+
+              <li className="menu-item">
+                <a className={`menu-link ${currentView === 'inventory' ? 'active' : ''}`} onClick={() => { setCurrentView('inventory'); setSidebarMobileOpen(false); }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  <span>Almacén / Stock</span>
+                </a>
+              </li>
+
+              <li className="menu-item">
+                <a className={`menu-link ${currentView === 'clients' ? 'active' : ''}`} onClick={() => { setCurrentView('clients'); setSidebarMobileOpen(false); }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span>Clientes</span>
+                </a>
+              </li>
+
+              <li className="menu-item">
+                <a className={`menu-link ${currentView === 'appointments' ? 'active' : ''}`} onClick={() => { setCurrentView('appointments'); setSidebarMobileOpen(false); }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>Citas y Agenda</span>
+                </a>
+              </li>
+
+              {sessionUser.role === 'admin' && (
+                <li className="menu-item">
+                  <a className={`menu-link ${currentView === 'users' ? 'active' : ''}`} onClick={() => { setCurrentView('users'); setSidebarMobileOpen(false); }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    <span>Usuarios & Accesos</span>
+                  </a>
+                </li>
+              )}
+            </ul>
+
+            <div className="sidebar-footer">
+              <button onClick={handleLogout} className="btn btn-danger" style={{ width: '100%' }}>
+                Cerrar Sesión
+              </button>
+              <button onClick={resetDatabase} className="btn btn-secondary" style={{ width: '100%', fontSize: '0.75rem', padding: '6px' }}>
+                Restablecer Demo
+              </button>
+            </div>
+          </aside>
+
+          {/* [ÁREA PRINCIPAL] Contenido dinámico según vista activa */}
+          {/* Main Area Wrapper */}
+          <main className="main-wrapper">
+            <header className="topbar">
+              <div className="topbar-title-section">
+                <button className="menu-toggle" onClick={() => {
+                  if (window.innerWidth <= 768) {
+                    setSidebarMobileOpen(!sidebarMobileOpen);
+                  } else {
+                    setSidebarCollapsed(!sidebarCollapsed);
+                  }
+                }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                  </svg>
+                </button>
+                <h1 className="page-title">
+                  {currentView === 'dashboard' && 'Panel General'}
+                  {currentView === 'invoices' && 'Cobros de Facturación'}
+                  {currentView === 'inventory' && 'Inventario de Almacén'}
+                  {currentView === 'clients' && 'Control de Clientes & Deudas'}
+                  {currentView === 'appointments' && 'Citas & Servicios'}
+                  {currentView === 'users' && 'Usuarios & Permisos'}
+                </h1>
+              </div>
+
+              <div className="topbar-actions">
+                <div className="flex-gap-sm">
+                  <span style={{ fontSize: '0.825rem', color: 'var(--text-secondary)' }}>Operador: <strong style={{ color: 'var(--text-primary)' }}>{sessionUser.name}</strong></span>
+                  <span className={`role-tag role-${sessionUser.role}`}>
+                    {sessionUser.role.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+            </header>
+
+            <div className="content-body">
+              {hasPermission(currentView) ? (
+                <>
+                  {currentView === 'dashboard' && (
+                    <DashboardView
+                      products={products}
+                      invoices={invoices}
+                      appointments={appointments}
+                      clients={clients}
+                      showToast={showToast}
+                    />
+                  )}
+                  {currentView === 'invoices' && (
+                    <InvoicesView
+                      products={products}
+                      setProducts={setProducts}
+                      invoices={invoices}
+                      setInvoices={setInvoices}
+                      clients={clients}
+                      setClients={setClients}
+                      currentUser={sessionUser}
+                      billingRedirectState={billingRedirectState}
+                      setBillingRedirectState={setBillingRedirectState}
+                      showToast={showToast}
+                    />
+                  )}
+                  {currentView === 'inventory' && (
+                    <InventoryView
+                      products={products}
+                      setProducts={setProducts}
+                      currentUser={sessionUser}
+                      showToast={showToast}
+                    />
+                  )}
+                  {currentView === 'clients' && (
+                    <ClientsView
+                      clients={clients}
+                      setClients={setClients}
+                      currentUser={sessionUser}
+                      showToast={showToast}
+                    />
+                  )}
+                  {currentView === 'appointments' && (
+                    <AppointmentsView
+                      appointments={appointments}
+                      setAppointments={setAppointments}
+                      services={services}
+                      setServices={setServices}
+                      currentUser={sessionUser}
+                      setCurrentView={setCurrentView}
+                      setBillingRedirectState={setBillingRedirectState}
+                      showToast={showToast}
+                    />
+                  )}
+                  {currentView === 'users' && (
+                    <UsersView
+                      users={users}
+                      setUsers={setUsers}
+                      currentUser={sessionUser}
+                      showToast={showToast}
+                    />
+                  )}
+                </>
+              ) : (
+                <div className="unauthorized-panel">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <h3 className="unauthorized-title">Módulo Protegido</h3>
+                  <p>Tu rol de <strong>{sessionUser.role.toUpperCase()}</strong> no tiene accesos autorizados para ver este apartado.</p>
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    // --- VISTA: PANTALLA DE INICIO DE SESIÓN ---
+    function LoginView({ onLogin, users }) {
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        onLogin(email, password);
+      };
+
+      return (
+        <div className="login-container">
+          <div className="login-card">
+            <div className="login-header">
+              <div className="login-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+              </div>
+              <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>APEX FLOW</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '4px' }}>Gestión de Facturas & Inventario</p>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="form-group">
+                <label className="form-label">Correo electrónico</label>
+                <input type="email" className="form-control" placeholder="operador@apex.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Contraseña</label>
+                <input type="password" className="form-control" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </div>
+              <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px' }}>
+                Ingresar al Sistema
+              </button>
+            </form>
+
+            <div className="login-tips">
+              <span className="login-tips-title">🔑 Operadores Demo:</span>
+              <div className="login-tips-row">
+                <span>sofia.admin@apex.com</span>
+                <span><code>admin123</code></span>
+              </div>
+              <div className="login-tips-row">
+                <span>carlos.sales@apex.com</span>
+                <span><code>vendedor123</code></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- VISTA: TABLERO GENERAL ---
+    function DashboardView({ products, invoices, appointments, clients, showToast }) {
+      const totalSales = useMemo(() => invoices.reduce((sum, inv) => sum + inv.total, 0), [invoices]);
+
+      const totalProfit = useMemo(() => {
+        return invoices.reduce((sum, inv) => {
+          let invoiceCost = 0;
+          inv.items.forEach(item => {
+            const matched = products.find(p => p.id === item.productId);
+            const cost = matched ? matched.cost : (item.price * 0.6);
+            invoiceCost += (cost * item.quantity);
+          });
+          return sum + (inv.subtotal - invoiceCost);
+        }, 0);
+      }, [invoices, products]);
+
+      const lowStockCount = useMemo(() => products.filter(p => p.stock <= p.minStock).length, [products]);
+      const pendingAppointments = useMemo(() => appointments.filter(a => a.status === 'pending' || a.status === 'confirmed').length, [appointments]);
+      const clientCreditsTotal = useMemo(() => clients.reduce((sum, cl) => sum + (cl.balance || 0), 0), [clients]);
+
+      const chartData = useMemo(() => {
+        const days = ['28 May', '29 May', '30 May', '31 May', '01 Jun', '02 Jun'];
+        const values = [450, 980, 250, 1200, 3236, totalSales > 0 ? totalSales / 1.4 : 500];
+        return days.map((day, idx) => ({
+          label: day,
+          ventas: values[idx],
+          costos: values[idx] * 0.6
+        }));
+      }, [totalSales]);
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {lowStockCount > 0 && (
+            <div className="card text-warning" style={{ display: 'flex', alignItems: 'center', gap: '16px', borderLeft: '5px solid var(--warning)', padding: '16px 24px' }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <div>
+                <strong>Stock Crítico Detectado</strong>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '2px' }}>Existen {lowStockCount} artículos por debajo del inventario de seguridad.</p>
+              </div>
+            </div>
+          )}
+
+          <div className="stats-grid">
+            <div className="card stat-card">
+              <div className="stat-info">
+                <span className="stat-label">Ventas Registradas</span>
+                <span className="stat-value text-success">{formatMoney(totalSales)}</span>
+              </div>
+              <div className="stat-icon-wrapper stat-green">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="card stat-card">
+              <div className="stat-info">
+                <span className="stat-label">Ganancia Bruta</span>
+                <span className="stat-value" style={{ color: 'var(--accent-secondary)' }}>{formatMoney(totalProfit)}</span>
+              </div>
+              <div className="stat-icon-wrapper stat-blue" style={{ color: 'var(--accent-secondary)', backgroundColor: 'rgba(124, 58, 237, 0.08)', borderColor: 'rgba(124, 58, 237, 0.1)' }}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="card stat-card">
+              <div className="stat-info">
+                <span className="stat-label">Cuentas por Cobrar</span>
+                <span className="stat-value text-warning">{formatMoney(clientCreditsTotal)}</span>
+              </div>
+              <div className="stat-icon-wrapper stat-yellow">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="card stat-card">
+              <div className="stat-info">
+                <span className="stat-label">Citas Programadas</span>
+                <span className="stat-value" style={{ color: 'var(--accent-primary)' }}>{pendingAppointments} activas</span>
+              </div>
+              <div className="stat-icon-wrapper stat-blue">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="dashboard-details-grid">
+            <div className="card">
+              <h3 className="card-title">Balance de Ventas del Periodo</h3>
+              <div className="chart-container">
+                <svg className="chart-svg" viewBox="0 0 600 240">
+                  <line x1="50" y1="30" x2="570" y2="30" className="chart-grid-line" />
+                  <line x1="50" y1="90" x2="570" y2="90" className="chart-grid-line" />
+                  <line x1="50" y1="150" x2="570" y2="150" className="chart-grid-line" />
+                  <line x1="50" y1="200" x2="570" y2="200" stroke="#cbd5e1" strokeWidth="1" />
+                  {chartData.map((data, index) => {
+                    const groupSpacing = 85;
+                    const startX = 75 + (index * groupSpacing);
+                    const maxVal = 3500;
+                    const maxH = 170;
+                    const hVentas = (data.ventas / maxVal) * maxH;
+                    const yVentas = 200 - hVentas;
+                    const hCostos = (data.costos / maxVal) * maxH;
+                    const yCostos = 200 - hCostos;
+                    return (
+                      <g key={index}>
+                        <rect className="chart-bar" x={startX} y={yVentas} width="16" height={Math.max(hVentas, 2)} fill="var(--success)" rx="3" />
+                        <rect className="chart-bar" x={startX + 20} y={yCostos} width="16" height={Math.max(hCostos, 2)} fill="var(--danger)" rx="3" />
+                        <text x={startX + 18} y="222" fill="var(--text-secondary)" fontSize="10" textAnchor="middle" fontWeight="600">{data.label}</text>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
+            </div>
+
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h3 className="card-title">Créditos de Clientes</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {clients.filter(c => c.balance > 0).length === 0 ? (
+                  <span style={{ fontSize: '0.85rem', color: 'var(--success)' }}>Sin deudas crediticias pendientes.</span>
+                ) : (
+                  clients.filter(c => c.balance > 0).map(c => (
+                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderBottom: '1px solid var(--card-border)', paddingBottom: '6px' }}>
+                      <span>{c.name}</span>
+                      <strong className="text-danger">{formatMoney(c.balance)}</strong>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- VISTA: ADMINISTRACIÓN DE USUARIOS (SOLO ADMIN) ---
+    function UsersView({ users, setUsers, currentUser, showToast }) {
+      const [isAdding, setIsAdding] = useState(false);
+      const [name, setName] = useState('');
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [role, setRole] = useState('seller');
+
+      const handleAddUserSubmit = (e) => {
+        e.preventDefault();
+        const newUser = { id: `u-${Date.now()}`, name, email, password, role };
+        setUsers([...users, newUser]);
+        setIsAdding(false);
+        setName(''); setEmail(''); setPassword(''); setRole('seller');
+        showToast('Operador registrado.', 'success');
+      };
+
+      const handleDeleteUser = (id, uName) => {
+        if (id === currentUser.id) return;
+        if (!window.confirm(`¿Seguro que deseas eliminar a ${uName}?`)) return;
+        setUsers(users.filter(u => u.id !== id));
+        showToast('Operador eliminado.', 'success');
+      };
+
+      return (
+        <>
+          <div className="card">
+            <div className="table-header-controls">
+              <h2 className="card-title">Personal Autorizado</h2>
+              <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+                Agregar Operador
+              </button>
+            </div>
+
+            <div className="table-wrapper">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>Correo</th>
+                    <th>Contraseña</th>
+                    <th>Rol</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map(u => (
+                    <tr key={u.id}>
+                      <td className="font-bold">{u.name}</td>
+                      <td><code>{u.email}</code></td>
+                      <td><code>{u.password}</code></td>
+                      <td><span className={`role-tag role-${u.role}`}>{u.role.toUpperCase()}</span></td>
+                      <td>
+                        <button className="btn-icon-only text-danger" onClick={() => handleDeleteUser(u.id, u.name)} disabled={u.id === currentUser.id}>
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* MODAL RENDERED AS SIBLING TO CARD TO AVOID CONTAINMENT Coordinate Space BUG */}
+          {isAdding && (
+            <div className="modal-overlay" onClick={() => setIsAdding(false)}>
+              <div className="modal-window" style={{ maxWidth: '420px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3 className="card-title">Registrar Operador</h3>
+                  <button className="btn-icon-only" onClick={() => setIsAdding(false)}>✕</button>
+                </div>
+                <form onSubmit={handleAddUserSubmit}>
+                  <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Nombre Completo</label>
+                      <input type="text" className="form-control" value={name} onChange={(e) => setName(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Correo de Login</label>
+                      <input type="email" className="form-control" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Contraseña</label>
+                      <input type="password" className="form-control" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Rol</label>
+                      <select className="form-control" value={role} onChange={(e) => setRole(e.target.value)}>
+                        <option value="admin">Administrador (Acceso Total)</option>
+                        <option value="seller">Vendedor</option>
+                        <option value="inventory">Gestor de Stock</option>
+                        <option value="scheduler">Agendador</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary">Registrar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // --- VISTA: CLIENTES Y REGISTRO DE CRÉDITOS ---
+    function ClientsView({ clients, setClients, currentUser, showToast }) {
+      const [isAdding, setIsAdding] = useState(false);
+      const [searchTerm, setSearchTerm] = useState('');
+
+      const [name, setName] = useState('');
+      const [cid, setCid] = useState('');
+      const [address, setAddress] = useState('');
+      const [phone, setPhone] = useState('');
+      const [email, setEmail] = useState('');
+
+      const [payingClient, setPayingClient] = useState(null);
+      const [paymentAmount, setPaymentAmount] = useState('');
+
+      const handleAddClientSubmit = (e) => {
+        e.preventDefault();
+        const newClient = {
+          id: `c-${Date.now()}`,
+          name, cid: cid.toUpperCase(),
+          address: address || 'Sin dirección',
+          phone, email, balance: 0
+        };
+        setClients([...clients, newClient]);
+        setIsAdding(false);
+        setName(''); setCid(''); setAddress(''); setPhone(''); setEmail('');
+        showToast('Cliente registrado.', 'success');
+      };
+
+      const handleProcessDebtPayment = (e) => {
+        e.preventDefault();
+        const amount = Number(paymentAmount);
+        if (amount <= 0 || amount > payingClient.balance) {
+          showToast('Monto inválido.', 'danger');
+          return;
+        }
+        setClients(clients.map(c => (c.id === payingClient.id ? { ...c, balance: c.balance - amount } : c)));
+        setPayingClient(null);
+        setPaymentAmount('');
+        showToast('Abono registrado con éxito.', 'success');
+      };
+
+      const filteredClients = useMemo(() => {
+        return clients.filter(c =>
+          c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          c.cid.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }, [clients, searchTerm]);
+
+      return (
+        <>
+          <div className="card">
+            <div className="table-header-controls">
+              <h2 className="card-title">Directorio General de Clientes</h2>
+              <div className="flex-gap-sm">
+                <input type="text" placeholder="Buscar por nombre o identificación..." className="search-field" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <button className="btn btn-primary" onClick={() => setIsAdding(true)}>
+                  Registrar Cliente
+                </button>
+              </div>
+            </div>
+
+            <div className="table-wrapper">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Nombre</th>
+                    <th>CI / RIF</th>
+                    <th>Teléfono</th>
+                    <th>Correo</th>
+                    <th>Dirección</th>
+                    <th>Saldo Deudor</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredClients.map(c => (
+                    <tr key={c.id}>
+                      <td className="font-bold">{c.name}</td>
+                      <td><code>{c.cid}</code></td>
+                      <td>{c.phone}</td>
+                      <td>{c.email}</td>
+                      <td>{c.address}</td>
+                      <td className={`font-bold ${c.balance > 0 ? 'text-danger' : 'text-success'}`}>{formatMoney(c.balance)}</td>
+                      <td>
+                        {c.balance > 0 && (
+                          <button className="btn btn-success" style={{ padding: '4px 8px', fontSize: '0.75rem' }} onClick={() => setPayingClient(c)}>
+                            Abonar Deuda
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* MODALS RENDERED AS SIBLINGS TO THE CARD BLOCK */}
+          {isAdding && (
+            <div className="modal-overlay" onClick={() => setIsAdding(false)}>
+              <div className="modal-window" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3 className="card-title">Registrar Nuevo Cliente</h3>
+                  <button className="btn-icon-only" onClick={() => setIsAdding(false)}>✕</button>
+                </div>
+                <form onSubmit={handleAddClientSubmit}>
+                  <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Nombre Completo</label>
+                        <input type="text" className="form-control" value={name} onChange={(e) => setName(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Cédula / RIF</label>
+                        <input type="text" className="form-control" value={cid} onChange={(e) => setCid(e.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Teléfono</label>
+                        <input type="tel" className="form-control" value={phone} onChange={(e) => setPhone(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Correo Electrónico</label>
+                        <input type="email" className="form-control" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Dirección</label>
+                      <input type="text" className="form-control" value={address} onChange={(e) => setAddress(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary">Registrar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* CENTERING FIXED BUG: rendered as sibling to CARD */}
+          {payingClient && (
+            <div className="modal-overlay" onClick={() => setPayingClient(null)}>
+              <div className="modal-window" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3 className="card-title">Procesar Abono a Cuenta</h3>
+                  <button className="btn-icon-only" onClick={() => setPayingClient(null)}>✕</button>
+                </div>
+                <form onSubmit={handleProcessDebtPayment}>
+                  <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <p>Cliente: <strong>{payingClient.name}</strong></p>
+                    <p>Deuda Pendiente: <strong className="text-danger">{formatMoney(payingClient.balance)}</strong></p>
+                    <div className="form-group">
+                      <label className="form-label">Monto del Abono ($)</label>
+                      <input type="number" min="0.01" step="0.01" className="form-control" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} required />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setPayingClient(null)}>Cancelar</button>
+                    <button type="submit" className="btn btn-success">Procesar Abono</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // --- VISTA: FACTURACIÓN Y COBROS (POSIBLE ESCÁNER) ---
+    function InvoicesView({ products, setProducts, invoices, setInvoices, clients, setClients, currentUser, billingRedirectState, setBillingRedirectState, showToast }) {
+      const [isCreating, setIsCreating] = useState(false);
+      const [searchTerm, setSearchTerm] = useState('');
+
+      const [viewingInvoice, setViewingInvoice] = useState(null);
+
+      // Create Invoice Form States
+      const [selectedClientId, setSelectedClientId] = useState('');
+      const [invoiceItems, setInvoiceItems] = useState([]);
+      const [selectedProductId, setSelectedProductId] = useState('');
+      const [selectedQuantity, setSelectedQuantity] = useState(1);
+
+      // Scanner states
+      const [barcodeInput, setBarcodeInput] = useState('');
+      const [showCameraScanner, setShowCameraScanner] = useState(false);
+
+      // Checkout states
+      const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
+      const [paymentMethod, setPaymentMethod] = useState('efectivo');
+
+      // Payment Details Form States
+      const [cashReceived, setCashReceived] = useState('');
+      const [pagoMovilRef, setPagoMovilRef] = useState('');
+      const [transfRef, setTransfRef] = useState('');
+      const [transfBank, setTransfBank] = useState('');
+      const [transfCid, setTransfCid] = useState('');
+      const [posRef, setPosRef] = useState('');
+      const [cuotasDownpayment, setCuotasDownpayment] = useState('');
+      const [cuotasPlazo, setCuotasPlazo] = useState(3);
+
+      const canWrite = currentUser.role === 'admin' || currentUser.role === 'seller';
+
+      // Load billingRedirectState if exists (appointment flow)
+      useEffect(() => {
+        if (billingRedirectState) {
+          setIsCreating(true);
+          const matched = clients.find(c => c.name.toLowerCase() === billingRedirectState.clientName.toLowerCase());
+          if (matched) {
+            setSelectedClientId(matched.id);
+          } else {
+            const newClientId = `c-${Date.now()}`;
+            const newClient = {
+              id: newClientId,
+              name: billingRedirectState.clientName,
+              cid: 'V-' + Math.floor(Math.random() * 10000000 + 10000000),
+              address: 'Registrado vía cita',
+              phone: billingRedirectState.clientPhone || '0412-0000000',
+              email: 'cliente.citas@apex.com',
+              balance: 0
+            };
+            setClients(prev => [...prev, newClient]);
+            setSelectedClientId(newClientId);
+          }
+
+          setInvoiceItems([
+            { productId: 'service-linked', name: billingRedirectState.serviceName, price: billingRedirectState.servicePrice, quantity: 1 }
+          ]);
+
+          setBillingRedirectState(null);
+          showToast('Servicio cargado en facturación.', 'success');
+        }
+      }, [billingRedirectState, clients, setClients, setBillingRedirectState, showToast]);
+
+      const builderSubtotal = useMemo(() => {
+        return invoiceItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      }, [invoiceItems]);
+
+      const builderTax = useMemo(() => builderSubtotal * 0.16, [builderSubtotal]);
+      const builderTotal = useMemo(() => builderSubtotal + builderTax, [builderSubtotal, builderTax]);
+
+      const calculatedChange = useMemo(() => {
+        if (!cashReceived) return 0;
+        const diff = Number(cashReceived) - builderTotal;
+        return diff >= 0 ? diff : 0;
+      }, [cashReceived, builderTotal]);
+
+      const cuotasFinancedAmount = useMemo(() => {
+        const dp = cuotasDownpayment ? Number(cuotasDownpayment) : 0;
+        const diff = builderTotal - dp;
+        return diff >= 0 ? diff : 0;
+      }, [cuotasDownpayment, builderTotal]);
+
+      const cuotaIndividualPrice = useMemo(() => {
+        return cuotasPlazo > 0 ? (cuotasFinancedAmount / cuotasPlazo) : 0;
+      }, [cuotasFinancedAmount, cuotasPlazo]);
+
+      const handleBarcodeSubmit = (e) => {
+        e.preventDefault();
+        if (!barcodeInput) return;
+
+        const matched = products.find(p => p.sku.toUpperCase() === barcodeInput.toUpperCase());
+        if (!matched) {
+          showToast(`SKU "${barcodeInput}" no encontrado.`, 'danger');
+          setBarcodeInput('');
+          return;
+        }
+
+        if (matched.stock <= 0) {
+          showToast(`Producto ${matched.name} agotado.`, 'danger');
+          setBarcodeInput('');
+          return;
+        }
+
+        const existingIdx = invoiceItems.findIndex(item => item.productId === matched.id);
+        if (existingIdx >= 0) {
+          const currentQty = invoiceItems[existingIdx].quantity;
+          if (currentQty + 1 > matched.stock) {
+            showToast(`Sin existencias suficientes.`, 'danger');
+            setBarcodeInput('');
+            return;
+          }
+          const updated = [...invoiceItems];
+          updated[existingIdx].quantity = currentQty + 1;
+          setInvoiceItems(updated);
+        } else {
+          setInvoiceItems([...invoiceItems, { productId: matched.id, name: matched.name, price: matched.price, quantity: 1 }]);
+        }
+
+        setBarcodeInput('');
+        showToast(`Escaneado: ${matched.name} agregado.`, 'success');
+      };
+
+      const handleAddItemDirectly = () => {
+        if (!selectedProductId) return;
+        const product = products.find(p => p.id === selectedProductId);
+        if (!product) return;
+
+        const existingIdx = invoiceItems.findIndex(i => i.productId === selectedProductId);
+        const currentQty = existingIdx >= 0 ? invoiceItems[existingIdx].quantity : 0;
+        const requestedQty = currentQty + Number(selectedQuantity);
+
+        if (requestedQty > product.stock) {
+          showToast(`Stock insuficiente. Quedan ${product.stock} unidades.`, 'danger');
+          return;
+        }
+
+        if (existingIdx >= 0) {
+          const updated = [...invoiceItems];
+          updated[existingIdx].quantity = requestedQty;
+          setInvoiceItems(updated);
+        } else {
+          setInvoiceItems([...invoiceItems, { productId: product.id, name: product.name, price: product.price, quantity: Number(selectedQuantity) }]);
+        }
+        setSelectedProductId(''); setSelectedQuantity(1);
+        showToast('Producto agregado.', 'success');
+      };
+
+      const handleRemoveItem = (idx) => {
+        const updated = [...invoiceItems];
+        updated.splice(idx, 1);
+        setInvoiceItems(updated);
+      };
+
+      const handleCommitPaymentAndCreateInvoice = (e) => {
+        e.preventDefault();
+        const clientObj = clients.find(c => c.id === selectedClientId);
+        if (!clientObj) return;
+
+        let paymentDetails = {};
+        if (paymentMethod === 'efectivo') {
+          if (Number(cashReceived) < builderTotal) {
+            showToast('El monto recibido es menor al total.', 'danger');
+            return;
+          }
+          paymentDetails = { recibido: Number(cashReceived), cambio: calculatedChange };
+        } else if (paymentMethod === 'pago_movil') {
+          if (!pagoMovilRef) return;
+          paymentDetails = { referencia: pagoMovilRef };
+        } else if (paymentMethod === 'transferencia') {
+          if (!transfRef || !transfBank || !transfCid) return;
+          paymentDetails = { banco: transfBank, referencia: transfRef, emisorCid: transfCid };
+        } else if (paymentMethod === 'pos') {
+          if (!posRef) return;
+          paymentDetails = { referencia: posRef };
+        } else if (paymentMethod === 'cuotas') {
+          const dp = cuotasDownpayment ? Number(cuotasDownpayment) : 0;
+          paymentDetails = { abonoInicial: dp, plazoCuotas: cuotasPlazo, saldoDeuda: cuotasFinancedAmount };
+
+          setClients(clients.map(c => (c.id === clientObj.id ? { ...c, balance: c.balance + cuotasFinancedAmount } : c)));
+        }
+
+        // Deduct quantities
+        setProducts(products.map(prod => {
+          const soldItem = invoiceItems.find(item => item.productId === prod.id);
+          if (soldItem && prod.id !== 'service-linked') {
+            return { ...prod, stock: prod.stock - soldItem.quantity };
+          }
+          return prod;
+        }));
+
+        const nextNum = invoices.length > 0 ? Number(invoices[invoices.length - 1].id.split('-')[1]) + 1 : 1001;
+        const invoiceId = `FC-${nextNum}`;
+
+        const finalizedInvoice = {
+          id: invoiceId, clientId: clientObj.id, customerName: clientObj.name, customerId: clientObj.cid,
+          date: new Date().toISOString().split('T')[0], items: invoiceItems, subtotal: builderSubtotal, tax: builderTax, total: builderTotal,
+          paymentMethod, paymentDetails
+        };
+
+        setInvoices([...invoices, finalizedInvoice]);
+
+        setIsCreating(false); setCheckoutModalOpen(false); setSelectedClientId(''); setInvoiceItems([]);
+        setCashReceived(''); setPagoMovilRef(''); setTransfRef(''); setTransfBank(''); setTransfCid(''); setPosRef(''); setCuotasDownpayment(''); setCuotasPlazo(3);
+        showToast(`Factura ${invoiceId} emitida.`, 'success');
+      };
+
+      const filteredInvoices = useMemo(() => {
+        if (!searchTerm) return invoices;
+        const q = searchTerm.toLowerCase();
+        return invoices.filter(i => i.id.toLowerCase().includes(q) || i.customerName.toLowerCase().includes(q));
+      }, [invoices, searchTerm]);
+
+      return (
+        <>
+          <div className="card">
+            <div className="table-header-controls">
+              <h2 className="card-title">Registro General de Ventas</h2>
+              <div className="flex-gap-sm">
+                <input type="text" placeholder="Buscar factura..." className="search-field" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                {canWrite && !isCreating && (
+                  <button className="btn btn-primary" onClick={() => setIsCreating(true)}>
+                    Emitir Factura
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {isCreating && (
+              <div style={{ border: '1.5px dashed var(--accent-primary)', borderRadius: '12px', padding: '20px', marginBottom: '24px', backgroundColor: 'var(--bg-primary)' }}>
+                <div className="flex-between" style={{ marginBottom: '16px' }}>
+                  <h3 className="card-title" style={{ color: 'var(--accent-primary)', marginBottom: 0 }}>Caja Facturadora</h3>
+                  <button className="btn btn-secondary" onClick={() => setIsCreating(false)}>Cancelar</button>
+                </div>
+
+                <div className="form-row" style={{ marginBottom: '16px' }}>
+                  <form onSubmit={handleBarcodeSubmit} style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                    <input type="text" className="form-control" placeholder="Escanear SKU de producto... (Ej: KEY-LOGI-MX, LAP-DELL-01)" value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)} />
+                    <button type="submit" className="btn btn-primary">Escanear</button>
+                  </form>
+                  <button className="btn btn-secondary" onClick={() => setShowCameraScanner(true)}>📷 Cámara</button>
+                </div>
+
+                <div className="split-form-layout">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Cliente Asociado</label>
+                      <select className="form-control" value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} required>
+                        <option value="">-- Selecciona --</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.cid})</option>)}
+                      </select>
+                    </div>
+
+                    <div className="form-row">
+                      <div className="form-group" style={{ flexGrow: 2 }}>
+                        <label className="form-label">Agregar Producto Manual</label>
+                        <select className="form-control" value={selectedProductId} onChange={(e) => setSelectedProductId(e.target.value)}>
+                          <option value="">-- Elige --</option>
+                          {products.map(p => <option key={p.id} value={p.id} disabled={p.stock <= 0}>{p.name} ({p.stock} disp.)</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group" style={{ maxWidth: '80px' }}>
+                        <label className="form-label">Cant.</label>
+                        <input type="number" min="1" className="form-control" value={selectedQuantity} onChange={(e) => setSelectedQuantity(e.target.value)} />
+                      </div>
+                    </div>
+                    <button className="btn btn-secondary" style={{ alignSelf: 'flex-start' }} onClick={handleAddItemDirectly}>Agregar</button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    <div className="table-wrapper" style={{ maxHeight: '160px' }}>
+                      <table className="custom-table" style={{ fontSize: '0.8rem' }}>
+                        <thead>
+                          <tr>
+                            <th>Detalle</th>
+                            <th>P. Unit</th>
+                            <th>Cant</th>
+                            <th>Total</th>
+                            <th></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {invoiceItems.map((item, idx) => (
+                            <tr key={idx}>
+                              <td>{item.name}</td>
+                              <td>{formatMoney(item.price)}</td>
+                              <td>{item.quantity}</td>
+                              <td>{formatMoney(item.price * item.quantity)}</td>
+                              <td><button className="btn-icon-only text-danger" onClick={() => handleRemoveItem(idx)}>✕</button></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="invoice-summary-card">
+                      <div className="summary-row"><span>Subtotal:</span><span>{formatMoney(builderSubtotal)}</span></div>
+                      <div className="summary-row"><span>IVA (16%):</span><span>{formatMoney(builderTax)}</span></div>
+                      <div className="summary-total summary-row"><span>Total Neto:</span><span>{formatMoney(builderTotal)}</span></div>
+                    </div>
+
+                    <button className="btn btn-success" onClick={() => {
+                      if (!selectedClientId || invoiceItems.length === 0) return;
+                      setCheckoutModalOpen(true);
+                    }}>Procesar Pago</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="table-wrapper">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>Factura No.</th>
+                    <th>Cliente</th>
+                    <th>Identificación</th>
+                    <th>Fecha</th>
+                    <th>Método</th>
+                    <th>Total</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredInvoices.slice().reverse().map(inv => (
+                    <tr key={inv.id}>
+                      <td className="font-bold text-success">{inv.id}</td>
+                      <td>{inv.customerName}</td>
+                      <td><code>{inv.customerId}</code></td>
+                      <td>{inv.date}</td>
+                      <td><span className="badge badge-success">{inv.paymentMethod.toUpperCase()}</span></td>
+                      <td className="font-bold">{formatMoney(inv.total)}</td>
+                      <td>
+                        <button className="btn btn-secondary btn-icon-only" onClick={() => setViewingInvoice(inv)}>
+                          👁️
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ALL VIEW MODALS MOVED SIBLING OUT OF CARD TO CENTER IN THE VIEWPORT MATH-WISE */}
+          {showCameraScanner && (
+            <div className="modal-overlay" onClick={() => setShowCameraScanner(false)}>
+              <div className="modal-window" style={{ maxWidth: '350px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h4 className="card-title">Simulador de Escáner por Cámara</h4>
+                  <button className="btn-icon-only" onClick={() => setShowCameraScanner(false)}>✕</button>
+                </div>
+                <div className="modal-body text-center">
+                  <div className="scanner-container-box">
+                    <div className="scanner-laser-line"></div>
+                    <div className="scanner-target-sight"></div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Simular escaneo de:</label>
+                    <select className="form-control" onChange={(e) => {
+                      if (e.target.value) {
+                        setBarcodeInput(e.target.value);
+                        setShowCameraScanner(false);
+                        showToast('Lector procesado.', 'success');
+                      }
+                    }}>
+                      <option value="">-- Elige --</option>
+                      {products.map(p => <option key={p.id} value={p.sku}>{p.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {checkoutModalOpen && (
+            <div className="modal-overlay" onClick={() => setCheckoutModalOpen(false)}>
+              <div className="modal-window" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3 className="card-title">Pasarela de Cobro y Cierre</h3>
+                  <button className="btn-icon-only" onClick={() => setCheckoutModalOpen(false)}>✕</button>
+                </div>
+                <form onSubmit={handleCommitPaymentAndCreateInvoice}>
+                  <div className="modal-body">
+                    <p style={{ marginBottom: '14px', fontSize: '1rem', fontWeight: 700 }}>Total Neto a Recibir: <span className="text-success">{formatMoney(builderTotal)}</span></p>
+
+                    <div className="payment-tabs">
+                      <button type="button" className={`payment-tab-btn ${paymentMethod === 'efectivo' ? 'active' : ''}`} onClick={() => setPaymentMethod('efectivo')}>💵 Efectivo</button>
+                      <button type="button" className={`payment-tab-btn ${paymentMethod === 'pago_movil' ? 'active' : ''}`} onClick={() => setPaymentMethod('pago_movil')}>📲 Pago Móvil</button>
+                      <button type="button" className={`payment-tab-btn ${paymentMethod === 'transferencia' ? 'active' : ''}`} onClick={() => setPaymentMethod('transferencia')}>🏛️ Transf.</button>
+                      <button type="button" className={`payment-tab-btn ${paymentMethod === 'pos' ? 'active' : ''}`} onClick={() => setPaymentMethod('pos')}>💳 POS Card</button>
+                      <button type="button" className={`payment-tab-btn ${paymentMethod === 'cuotas' ? 'active' : ''}`} onClick={() => setPaymentMethod('cuotas')}>⏱️ Cuotas</button>
+                    </div>
+
+                    <div className="payment-details-panel">
+                      {paymentMethod === 'efectivo' && (
+                        <div>
+                          <div className="form-group">
+                            <label className="form-label">Efectivo Recibido ($)</label>
+                            <input type="number" step="0.01" className="form-control" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} required />
+                          </div>
+                          <div className="summary-row" style={{ marginTop: '12px', fontWeight: 'bold' }}>
+                            <span>Cambio a devolver:</span>
+                            <span className="text-success">{formatMoney(calculatedChange)}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {paymentMethod === 'pago_movil' && (
+                        <div className="text-center">
+                          <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Escanear código de Pago Móvil:</p>
+                          <div className="qr-box-container">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" style={{ width: '100%', height: '100%' }}>
+                              <rect width="100" height="100" fill="white" />
+                              <path d="M5 5h30v30H5zm6 6h18v18H11zM65 5h30v30H65zm6 6h18v18H71zM5 65h30v30H5zm6 6h18v18H11z" fill="black" />
+                              <path d="M45 5h10v10H45zm5 15h10v10H50zm15 35h10v10H65zm15 5h15v10H80zm-15 15h10v15H65zm-15 5h10v10H50zm-15-5h10v10H35zm15-20h10v10H50zm-20 0h10v10H30zm15-15h15v10H45zm35-15h15v10H80zm5 30h10v10H85zm-30 35h10v10H55z" fill="black" />
+                            </svg>
+                          </div>
+                          <div style={{ textAlign: 'left', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
+                            <span><strong>Empresa:</strong> Apex Flow S.A.</span>
+                            <span><strong>Banco:</strong> Mercantil (0105)</span>
+                            <span><strong>Teléfono:</strong> 0412-5558888</span>
+                            <span><strong>RIF:</strong> J-44555666-0</span>
+                          </div>
+                          <div className="form-group" style={{ textAlign: 'left' }}>
+                            <label className="form-label">Código de Referencia (6 dígitos)</label>
+                            <input type="text" className="form-control" value={pagoMovilRef} onChange={(e) => setPagoMovilRef(e.target.value)} required />
+                          </div>
+                        </div>
+                      )}
+
+                      {paymentMethod === 'transferencia' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '2px', borderBottom: '1px solid var(--card-border)', paddingBottom: '6px' }}>
+                            <span><strong>Cuenta Corriente BDV:</strong> 0102-0948-29-0102030405</span>
+                            <span><strong>RIF:</strong> J-44555666-0</span>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Banco Emisor</label>
+                            <input type="text" className="form-control" value={transfBank} onChange={(e) => setTransfBank(e.target.value)} required />
+                          </div>
+                          <div className="form-row">
+                            <div className="form-group">
+                              <label className="form-label">Cédula emisor</label>
+                              <input type="text" className="form-control" value={transfCid} onChange={(e) => setTransfCid(e.target.value)} required />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Referencia</label>
+                              <input type="text" className="form-control" value={transfRef} onChange={(e) => setTransfRef(e.target.value)} required />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {paymentMethod === 'pos' && (
+                        <div>
+                          <div className="form-group">
+                            <label className="form-label">Referencia / Lote POS</label>
+                            <input type="text" className="form-control" value={posRef} onChange={(e) => setPosRef(e.target.value)} required />
+                          </div>
+                        </div>
+                      )}
+
+                      {paymentMethod === 'cuotas' && (
+                        <div>
+                          <div className="form-row">
+                            <div className="form-group">
+                              <label className="form-label">Abono Inicial ($)</label>
+                              <input type="number" step="0.01" className="form-control" value={cuotasDownpayment} onChange={(e) => setCuotasDownpayment(e.target.value)} />
+                            </div>
+                            <div className="form-group">
+                              <label className="form-label">Plazo de Cuotas</label>
+                              <select className="form-control" value={cuotasPlazo} onChange={(e) => setCuotasPlazo(Number(e.target.value))}>
+                                <option value="2">2 Cuotas</option>
+                                <option value="3">3 Cuotas</option>
+                                <option value="4">4 Cuotas</option>
+                                <option value="6">6 Cuotas</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div style={{ marginTop: '12px', fontSize: '0.85rem' }}>
+                            <div className="summary-row"><span>Deuda Financiada:</span><strong className="text-danger">{formatMoney(cuotasFinancedAmount)}</strong></div>
+                            <div className="summary-row"><span>Cuota Mensual:</span><strong>{formatMoney(cuotaIndividualPrice)}</strong></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setCheckoutModalOpen(false)}>Atrás</button>
+                    <button type="submit" className="btn btn-success">Registrar Cobro</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {viewingInvoice && (
+            <div className="modal-overlay" onClick={() => setViewingInvoice(null)}>
+              <div className="modal-window" style={{ maxWidth: '440px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3 className="card-title">Comprobante de Caja</h3>
+                  <button className="btn-icon-only" onClick={() => setViewingInvoice(null)}>✕</button>
+                </div>
+                <div className="modal-body" style={{ backgroundColor: '#f1f5f9', padding: '16px' }}>
+                  <div className="receipt-container">
+                    <div className="receipt-header">
+                      <span className="receipt-title">APEX FLOW S.A.</span>
+                      <span>RIF: J-44555666-0</span>
+                      <span>Av. de las Ciencias, Caracas</span>
+                    </div>
+                    <div className="receipt-line"></div>
+                    <div className="receipt-row"><span>FACTURA:</span><strong>{viewingInvoice.id}</strong></div>
+                    <div className="receipt-row"><span>FECHA:</span><span>{viewingInvoice.date}</span></div>
+                    <div className="receipt-row"><span>CLIENTE:</span><span>{viewingInvoice.customerName}</span></div>
+                    <div className="receipt-row"><span>CI / RIF:</span><span>{viewingInvoice.customerId}</span></div>
+                    <div className="receipt-line"></div>
+                    <div className="receipt-items">
+                      <div className="receipt-item-row font-bold"><span>DETALLE</span><span className="text-right">CANT</span><span className="text-right">TOTAL</span></div>
+                      {viewingInvoice.items.map((item, idx) => (
+                        <div key={idx} className="receipt-item-row">
+                          <span>{item.name}</span><span className="text-right">x{item.quantity}</span><span className="text-right">{formatMoney(item.price * item.quantity)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="receipt-line"></div>
+                    <div className="receipt-row"><span>SUBTOTAL:</span><span>{formatMoney(viewingInvoice.subtotal)}</span></div>
+                    <div className="receipt-row"><span>IVA (16%):</span><span>{formatMoney(viewingInvoice.tax)}</span></div>
+                    <div className="receipt-row font-bold"><span>TOTAL NETO:</span><span>{formatMoney(viewingInvoice.total)}</span></div>
+                    <div className="receipt-line"></div>
+                    <div className="receipt-row font-bold"><span>METODO PAGO:</span><span>{viewingInvoice.paymentMethod.toUpperCase()}</span></div>
+
+                    {viewingInvoice.paymentMethod === 'efectivo' && (
+                      <div>
+                        <div className="receipt-row"><span>RECIBIDO:</span><span>{formatMoney(viewingInvoice.paymentDetails.recibido)}</span></div>
+                        <div className="receipt-row"><span>CAMBIO:</span><span>{formatMoney(viewingInvoice.paymentDetails.cambio)}</span></div>
+                      </div>
+                    )}
+                    {viewingInvoice.paymentMethod === 'pago_movil' && (
+                      <div className="receipt-row"><span>REF PAGO MOVIL:</span><span>{viewingInvoice.paymentDetails.referencia}</span></div>
+                    )}
+                    {viewingInvoice.paymentMethod === 'transferencia' && (
+                      <div>
+                        <div className="receipt-row"><span>BANCO:</span><span>{viewingInvoice.paymentDetails.banco}</span></div>
+                        <div className="receipt-row"><span>REF:</span><span>{viewingInvoice.paymentDetails.referencia}</span></div>
+                      </div>
+                    )}
+                    {viewingInvoice.paymentMethod === 'pos' && (
+                      <div className="receipt-row"><span>REF POS:</span><span>{viewingInvoice.paymentDetails.referencia}</span></div>
+                    )}
+                    {viewingInvoice.paymentMethod === 'cuotas' && (
+                      <div>
+                        <div className="receipt-row"><span>ABONO INICIAL:</span><span>{formatMoney(viewingInvoice.paymentDetails.abonoInicial)}</span></div>
+                        <div className="receipt-row"><span>DEUDA FINANCIADA:</span><span className="text-danger">{formatMoney(viewingInvoice.paymentDetails.saldoDeuda)}</span></div>
+                      </div>
+                    )}
+                    <div className="receipt-line"></div>
+                    <div className="receipt-footer"><p>¡Gracias por su confianza!</p></div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button className="btn btn-secondary" onClick={() => setViewingInvoice(null)}>Cerrar</button>
+                  <button className="btn btn-primary" onClick={() => window.print()}>Imprimir</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // --- VISTA: INVENTARIO DE ALMACÉN ---
+    function InventoryView({ products, setProducts, currentUser, showToast }) {
+      const [searchTerm, setSearchTerm] = useState('');
+      const [categoryFilter, setCategoryFilter] = useState('All');
+      const [isAdding, setIsAdding] = useState(false);
+      const [editingProduct, setEditingProduct] = useState(null);
+
+      const [sku, setSku] = useState('');
+      const [name, setName] = useState('');
+      const [category, setCategory] = useState('');
+      const [cost, setCost] = useState('');
+      const [price, setPrice] = useState('');
+      const [stock, setStock] = useState('');
+      const [minStock, setMinStock] = useState('');
+
+      const canWrite = currentUser.role === 'admin' || currentUser.role === 'inventory';
+
+      const categories = useMemo(() => ['All', ...new Set(products.map(p => p.category))], [products]);
+
+      const handleQuickStockAdjust = (id, amount) => {
+        if (!canWrite) return;
+        setProducts(products.map(p => {
+          if (p.id === id) {
+            const next = p.stock + amount;
+            if (next < 0) return p;
+            showToast(`Inventario de ${p.name} ajustado.`, 'success');
+            return { ...p, stock: next };
+          }
+          return p;
+        }));
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const payload = { sku: sku.toUpperCase(), name, category, cost: Number(cost), price: Number(price), stock: Number(stock), minStock: Number(minStock) };
+        if (editingProduct) {
+          setProducts(products.map(p => (p.id === editingProduct.id ? { ...p, ...payload } : p)));
+          showToast('Ficha de artículo guardada.', 'success');
+          setEditingProduct(null);
+        } else {
+          setProducts([...products, { id: `p-${Date.now()}`, ...payload }]);
+          showToast('Artículo creado.', 'success');
+        }
+        setSku(''); setName(''); setCategory(''); setCost(''); setPrice(''); setStock(''); setMinStock('');
+        setIsAdding(false);
+      };
+
+      const triggerEdit = (p) => {
+        setEditingProduct(p); setSku(p.sku); setName(p.name); setCategory(p.category); setCost(p.cost); setPrice(p.price); setStock(p.stock); setMinStock(p.minStock);
+        setIsAdding(true);
+      };
+
+      const handleDelete = (id, pName) => {
+        if (!window.confirm(`¿Borrar ${pName}?`)) return;
+        setProducts(products.filter(p => p.id !== id));
+        showToast('Artículo eliminado.', 'success');
+      };
+
+      const filtered = useMemo(() => {
+        return products.filter(p => {
+          const sMatch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+          const cMatch = categoryFilter === 'All' || p.category === categoryFilter;
+          return sMatch && cMatch;
+        });
+      }, [products, searchTerm, categoryFilter]);
+
+      return (
+        <>
+          <div className="card">
+            <div className="table-header-controls">
+              <h2 className="card-title">Existencias en Almacén</h2>
+              <div className="flex-gap-sm">
+                <input type="text" placeholder="Buscar SKU..." className="search-field" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <select className="filter-select" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                  {categories.map((cat, idx) => <option key={idx} value={cat}>{cat === 'All' ? 'Todas las Categorías' : cat}</option>)}
+                </select>
+                {canWrite && (
+                  <button className="btn btn-primary" onClick={() => { setEditingProduct(null); setIsAdding(true); }}>
+                    Agregar Artículo
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="table-wrapper">
+              <table className="custom-table">
+                <thead>
+                  <tr>
+                    <th>SKU</th>
+                    <th>Nombre</th>
+                    <th>Categoría</th>
+                    <th>Costo</th>
+                    <th>Venta</th>
+                    <th>Stock</th>
+                    <th>Estatus</th>
+                    {canWrite && <th>Acciones</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(p => (
+                    <tr key={p.id}>
+                      <td><code>{p.sku}</code></td>
+                      <td className="font-bold">{p.name}</td>
+                      <td>{p.category}</td>
+                      <td>{formatMoney(p.cost)}</td>
+                      <td className="text-success font-bold">{formatMoney(p.price)}</td>
+                      <td>
+                        <div className="flex-gap-sm">
+                          {canWrite && <button className="btn-icon-only" style={{ padding: '2px 6px' }} onClick={() => handleQuickStockAdjust(p.id, -1)}>-</button>}
+                          <strong style={{ minWidth: '24px', textalign: 'center' }}>{p.stock}</strong>
+                          {canWrite && <button className="btn-icon-only" style={{ padding: '2px 6px' }} onClick={() => handleQuickStockAdjust(p.id, 1)}>+</button>}
+                        </div>
+                      </td>
+                      <td>
+                        {p.stock === 0 ? <span className="badge badge-danger">Agotado</span> : p.stock <= p.minStock ? <span className="badge badge-warning">Crítico</span> : <span className="badge badge-success">Suficiente</span>}
+                      </td>
+                      {canWrite && (
+                        <td>
+                          <div className="flex-gap-sm">
+                            <button className="btn-icon-only" onClick={() => triggerEdit(p)}>✎</button>
+                            <button className="btn-icon-only text-danger" onClick={() => handleDelete(p.id, p.name)}>✕</button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ADD PRODUCT MODAL SIBLING */}
+          {isAdding && (
+            <div className="modal-overlay" onClick={() => setIsAdding(false)}>
+              <div className="modal-window" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3 className="card-title">{editingProduct ? 'Editar Artículo' : 'Ingresar Artículo'}</h3>
+                  <button className="btn-icon-only" onClick={() => setIsAdding(false)}>✕</button>
+                </div>
+                <form onSubmit={handleSubmit}>
+                  <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">SKU</label>
+                        <input type="text" className="form-control" value={sku} onChange={(e) => setSku(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Categoría</label>
+                        <input type="text" className="form-control" value={category} onChange={(e) => setCategory(e.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Nombre del Artículo</label>
+                      <input type="text" className="form-control" value={name} onChange={(e) => setName(e.target.value)} required />
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Costo base ($)</label>
+                        <input type="number" step="0.01" className="form-control" value={cost} onChange={(e) => setCost(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Precio comercial ($)</label>
+                        <input type="number" step="0.01" className="form-control" value={price} onChange={(e) => setPrice(e.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Stock inicial</label>
+                        <input type="number" className="form-control" value={stock} onChange={(e) => setStock(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Mínimo de alerta</label>
+                        <input type="number" className="form-control" value={minStock} onChange={(e) => setMinStock(e.target.value)} required />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setIsAdding(false)}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary">Guardar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // --- VISTA: CITAS Y AGENDA ---
+    function AppointmentsView({ appointments, setAppointments, services, setServices, currentUser, setCurrentView, setBillingRedirectState, showToast }) {
+      const [isAddingAppointment, setIsAddingAppointment] = useState(false);
+      const [isAddingService, setIsAddingService] = useState(false);
+      const [statusFilter, setStatusFilter] = useState('All');
+
+      const [customerName, setCustomerName] = useState('');
+      const [customerPhone, setCustomerPhone] = useState('');
+      const [appointmentDate, setAppointmentDate] = useState('');
+      const [appointmentTime, setAppointmentTime] = useState('');
+      const [selectedServiceId, setSelectedServiceId] = useState('');
+      const [worker, setWorker] = useState('');
+
+      const [serviceName, setServiceName] = useState('');
+      const [serviceDuration, setServiceDuration] = useState('');
+      const [servicePrice, setServicePrice] = useState('');
+
+      const canWrite = currentUser.role === 'admin' || currentUser.role === 'scheduler';
+
+      const handleCompleteAndInvoiceLink = (appt) => {
+        if (!canWrite) return;
+        setAppointments(appointments.map(a => (a.id === appt.id ? { ...a, status: 'completed' } : a)));
+        const matched = services.find(s => s.id === appt.serviceId);
+        setBillingRedirectState({
+          clientName: appt.customerName,
+          clientPhone: appt.customerPhone,
+          serviceName: matched ? matched.name : 'Servicio Técnico',
+          servicePrice: matched ? matched.price : 50
+        });
+        showToast('Cita completada. Redirigiendo a caja de cobro...', 'success');
+        setCurrentView('invoices');
+      };
+
+      const handleAddAppointment = (e) => {
+        e.preventDefault();
+        const newAppt = { id: `a-${Date.now()}`, customerName, customerPhone: customerPhone || '0412-0000000', date: appointmentDate, time: appointmentTime, serviceId: selectedServiceId, worker, status: 'pending' };
+        setAppointments([...appointments, newAppt]);
+        setIsAddingAppointment(false);
+        setCustomerName(''); setCustomerPhone(''); setAppointmentDate(''); setAppointmentTime(''); setSelectedServiceId(''); setWorker('');
+        showToast('Turno agendado.', 'success');
+      };
+
+      const handleAddService = (e) => {
+        e.preventDefault();
+        const newService = { id: `s-${Date.now()}`, name: serviceName, duration: Number(serviceDuration), price: Number(servicePrice) };
+        setServices([...services, newService]);
+        setIsAddingService(false);
+        setServiceName(''); setServiceDuration(''); setServicePrice('');
+        showToast('Servicio añadido.', 'success');
+      };
+
+      const handleUpdateStatus = (id, status) => {
+        if (!canWrite) return;
+        setAppointments(appointments.map(a => (a.id === id ? { ...a, status } : a)));
+        showToast('Estatus de cita guardado.', 'success');
+      };
+
+      const filtered = useMemo(() => {
+        if (statusFilter === 'All') return appointments;
+        return appointments.filter(a => a.status === statusFilter);
+      }, [appointments, statusFilter]);
+
+      return (
+        <>
+          <div className="dashboard-details-grid" style={{ gridTemplateColumns: '2fr 1fr' }}>
+            <div className="card">
+              <div className="table-header-controls">
+                <h3 className="card-title">Agenda Diaria de Turnos</h3>
+                <div className="flex-gap-sm">
+                  <select className="filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option value="All">Todos</option>
+                    <option value="pending">Pendientes</option>
+                    <option value="confirmed">Confirmados</option>
+                    <option value="completed">Completados</option>
+                    <option value="cancelled">Cancelados</option>
+                  </select>
+                  {canWrite && (
+                    <button className="btn btn-primary" onClick={() => setIsAddingAppointment(true)}>
+                      Agendar Turno
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="table-wrapper">
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Cliente</th>
+                      <th>Fecha / Hora</th>
+                      <th>Servicio</th>
+                      <th>Especialista</th>
+                      <th>Estatus</th>
+                      {canWrite && <th>Acciones</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(appt => {
+                      const matched = services.find(s => s.id === appt.serviceId);
+                      return (
+                        <tr key={appt.id}>
+                          <td>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span className="font-bold">{appt.customerName}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{appt.customerPhone}</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span>{appt.date}</span><br />
+                            <strong className="text-success">{appt.time} hrs</strong>
+                          </td>
+                          <td className="font-bold">{matched ? matched.name : 'Servicio'}</td>
+                          <td>{appt.worker}</td>
+                          <td>
+                            {appt.status === 'pending' && <span className="badge badge-warning">Pendiente</span>}
+                            {appt.status === 'confirmed' && <span className="badge badge-success" style={{ backgroundColor: 'var(--accent-primary-light)', color: 'var(--accent-primary)', borderColor: 'rgba(79, 70, 229, 0.1)' }}>Confirmada</span>}
+                            {appt.status === 'completed' && <span className="badge badge-success">Completada</span>}
+                            {appt.status === 'cancelled' && <span className="badge badge-danger">Cancelada</span>}
+                          </td>
+                          {canWrite && (
+                            <td>
+                              <div className="flex-gap-sm">
+                                {appt.status === 'pending' && <button className="btn-icon-only text-success" onClick={() => handleUpdateStatus(appt.id, 'confirmed')}>✓</button>}
+                                {appt.status !== 'completed' && appt.status !== 'cancelled' && (
+                                  <>
+                                    <button className="btn btn-success" style={{ padding: '2px 6px', fontSize: '0.7rem' }} onClick={() => handleCompleteAndInvoiceLink(appt)}>Completar & Cobrar</button>
+                                    <button className="btn-icon-only text-danger" onClick={() => handleUpdateStatus(appt.id, 'cancelled')}>✕</button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="table-header-controls">
+                <h3 className="card-title">Oferta de Servicios</h3>
+                {canWrite && <button className="btn btn-secondary" style={{ padding: '4px 8px', fontSize: '0.725rem' }} onClick={() => setIsAddingService(true)}>+</button>}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {services.map(s => (
+                  <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', border: '1px solid var(--card-border)', borderRadius: '8px' }}>
+                    <div>
+                      <strong style={{ fontSize: '0.8rem', display: 'block' }}>{s.name}</strong>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>⏱ {s.duration} mins</span>
+                    </div>
+                    <span className="text-success font-bold" style={{ fontSize: '0.85rem' }}>{formatMoney(s.price)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* APPOINTMENT MODALS SIBLINGS */}
+          {isAddingAppointment && (
+            <div className="modal-overlay" onClick={() => setIsAddingAppointment(false)}>
+              <div className="modal-window" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3 className="card-title">Agendar Turno</h3>
+                  <button className="btn-icon-only" onClick={() => setIsAddingAppointment(false)}>✕</button>
+                </div>
+                <form onSubmit={handleAddAppointment}>
+                  <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Nombre del Cliente</label>
+                      <input type="text" className="form-control" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Teléfono</label>
+                      <input type="tel" className="form-control" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Fecha</label>
+                        <input type="date" className="form-control" value={appointmentDate} onChange={(e) => setAppointmentDate(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Hora</label>
+                        <input type="time" className="form-control" value={appointmentTime} onChange={(e) => setAppointmentTime(e.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label className="form-label">Servicio</label>
+                        <select className="form-control" value={selectedServiceId} onChange={(e) => setSelectedServiceId(e.target.value)} required>
+                          <option value="">-- Selecciona --</option>
+                          {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Especialista TI</label>
+                        <input type="text" className="form-control" value={worker} onChange={(e) => setWorker(e.target.value)} required />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setIsAddingAppointment(false)}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary">Agendar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {isAddingService && (
+            <div className="modal-overlay" onClick={() => setIsAddingService(false)}>
+              <div className="modal-window" style={{ maxWidth: '350px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h3 className="card-title">Registrar Servicio</h3>
+                  <button className="btn-icon-only" onClick={() => setIsAddingService(false)}>✕</button>
+                </div>
+                <form onSubmit={handleAddService}>
+                  <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Nombre</label>
+                      <input type="text" className="form-control" value={serviceName} onChange={(e) => setServiceName(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Duración (Minutos)</label>
+                      <input type="number" className="form-control" value={serviceDuration} onChange={(e) => setServiceDuration(e.target.value)} required />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Costo comercial ($)</label>
+                      <input type="number" className="form-control" value={servicePrice} onChange={(e) => setServicePrice(e.target.value)} required />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setIsAddingService(false)}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary">Registrar</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </>
+      );
+    }
+
+    // Render the React app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+
+</html>
