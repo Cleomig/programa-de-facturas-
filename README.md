@@ -19,6 +19,7 @@ npm run dev    # usa nodemon en desarrollo
 Notas:
 - Para usar Mongo Atlas, define `MONGODB_URI` con la cadena de conexión.
 - Hay un endpoint `/api/seed` que puede recibir objetos `users, clients, products, services, appointments, invoices` para inicializar la DB (útil durante desarrollo).
+<<<<<<< HEAD
 
 ## Despliegue en Render
 
@@ -47,3 +48,5 @@ Cuando termine, Render te entregará una URL pública del estilo `https://<nombr
 
 - `.gitignore`: ignora `node_modules`, `.env` y otros archivos locales.
 - `render.yaml`: configuración básica para desplegar en Render.
+=======
+>>>>>>> 543e2bcc49bf74384c96e79f7b2de2498d2b5528
