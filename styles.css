@@ -1173,3 +1173,19 @@ body {
     font-size: 1.05rem;
   }
 }
+
+/* Extra small phones adjustments */
+@media (max-width: 420px) {
+  .card { padding: 14px; }
+  .content-body { padding: 12px; }
+  .form-control { padding: 8px 10px; font-size: 0.85rem; }
+  .btn { padding: 10px 12px; font-size: 0.85rem; }
+  .stat-value { font-size: 1.25rem; }
+  .custom-table th, .custom-table td { padding: 8px 10px; font-size: 0.78rem; }
+  .logo-text { font-size: 1rem; }
+  .sidebar { width: 220px; }
+  .page-title { font-size: 0.98rem; }
+  /* Improve table readability by increasing row gap and allowing wrap */
+  .custom-table tbody tr { display: table-row; }
+  .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
