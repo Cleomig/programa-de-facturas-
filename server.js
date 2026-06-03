@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -8,10 +9,14 @@ app.use(cors());
 app.use(express.json());
 
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/apexflow';
+console.log('MongoDB URI seleccionada:', MONGODB_URI.includes('mongodb+srv') ? 'mongodb+srv (oculta)' : 'mongodb estándar (oculta)');
 
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('MongoDB conectado'))
-  .catch(err => console.error('MongoDB error:', err));
+  .catch(err => {
+    console.error('MongoDB error:', err);
+    process.exit(1);
+  });
 
 // Servir archivos estáticos del frontend desde la misma carpeta (para desarrollo)
 const path = require('path');
